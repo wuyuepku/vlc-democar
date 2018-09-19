@@ -4,13 +4,11 @@ from flask import Flask, render_template, jsonify, request, session, redirect, u
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import logging, json, time, math
 from libmotor import Motor
+from optparse import OptionParser
 app = Flask(__name__)
 socketio = SocketIO()
 socketio.init_app(app=app)
 logging.getLogger('werkzeug').setLevel(logging.ERROR)  # 设置不输出GET请求之类的信息，只输出error，保证控制台干净
-
-# serial = '/dev/ttyS1'
-serial = None  # simulator mode
 
 class CarObj(Motor):
     def __init__(self, serial=None):
@@ -27,7 +25,7 @@ class CarObj(Motor):
             self.setSpeed(1, v1/100.)
             self.setSpeed(2, v2/100.)
             self.setSpeed(3, v3/100.)
-carobj = CarObj(serial)
+carobj = None
 
 vx = 0
 vy = 0
@@ -116,4 +114,14 @@ def bkgtask():
 socketio.start_background_task(bkgtask)
 
 if __name__=='__main__':
-    socketio.run(app, host='0.0.0.0', port=666)
+    parser = OptionParser()
+    parser.add_option("--host", type="string", dest="host", help="Server Host IP", default="0.0.0.0")
+    parser.add_option("--port", type="int", dest="port", help="Server Host Port", default=8080)
+    parser.add_option("--serial", type="string", dest="serial", help="Serial number", default="")
+    options, args = parser.parse_args()
+    print("\n\n##############################################")
+    print("this will run on port %d of '%s'" % (options.port, options.host))
+    carobj = CarObj(None if options.serial == "" else options.serial)
+    print("serial is %s" % options.serial)
+    print("##############################################\n\n")
+    socketio.run(app, host=options.host, port=options.port)
