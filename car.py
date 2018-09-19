@@ -22,9 +22,9 @@ class CarObj(Motor):
             v1 = w + vy
             v2 = w + math.sqrt(3)/2 * vx - vy/2
             v3 = w - math.sqrt(3)/2 * vx - vy/2
-            self.setPIDspeed(1, v1)
-            self.setPIDspeed(2, v2)
-            self.setPIDspeed(3, v3)
+            self.setPIDspeed(1, v1 * 3)
+            self.setPIDspeed(2, v2 * 3)
+            self.setPIDspeed(3, v3 * 3)
 carobj = None
 
 vx = 0
