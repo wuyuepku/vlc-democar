@@ -22,9 +22,9 @@ class CarObj(Motor):
             v1 = w + vy
             v2 = w + math.sqrt(3)/2 * vx - vy/2
             v3 = w - math.sqrt(3)/2 * vx - vy/2
-            self.setSpeed(1, v1/100.)
-            self.setSpeed(2, v2/100.)
-            self.setSpeed(3, v3/100.)
+            self.setSpeed(1, v1/300.)
+            self.setSpeed(2, v2/300.)
+            self.setSpeed(3, v3/300.)
 carobj = None
 
 vx = 0
@@ -68,7 +68,7 @@ def ws_setspeed(speed):
     print(speed)
     setspeed(speed)
     sendSpeedToUser()
-play = {"mode": "square", "step": 0, "cnt": 0}
+play = {"mode": "", "step": 0, "cnt": 0}
 @socketio.on('setmode')
 def ws_setmode(mode):
     print(mode)
