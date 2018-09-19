@@ -12,6 +12,24 @@ class Motor:
         self.y = 0
         self.theta = 0
 
+    def setPIDspeed(self, channel, speed):  # pwm 为-1024到1024之间的浮点数，推荐使用500以下的
+        if channel not in (1,2,3):
+            return False
+        speed = int(speed)
+        if speed > 1023:
+            speed = 1023
+        if speed < -1023:
+            speed = -1023
+        direction = 0x00
+        if speed < 0:
+            direction = 0x10
+            speed = -speed
+        cmd1 = 0x0FF & ((channel << 6) | direction | 0x20 | (0x0F & (speed >> 6)))
+        cmd2 = 0x03F & speed
+        cmd = bytes((cmd1, cmd2))
+        # print(cmd, len(cmd), "%x %x" % (cmd1, cmd2))
+        self.port.write(cmd)
+
     def setSpeed(self, channel, pwm):  # pwm 为-1~1之间的浮点数，方向根据pwm正负自动调节
         if channel not in (1,2,3):
             return False
@@ -21,7 +39,7 @@ class Motor:
             pwm = -1
         direction = 0x10
         if pwm < 0:
-            direction = 0x20
+            direction = 0x00
             pwm = -pwm
         pwmcnt = int(pwm * self.pwmVal)
         cmd1 = 0x0FF & ((channel << 6) | direction | (0x0F & (pwmcnt >> 6)))
@@ -29,7 +47,7 @@ class Motor:
         cmd = bytes((cmd1, cmd2))
         # print(cmd, len(cmd), "%x %x" % (cmd1, cmd2))
         self.port.write(cmd)
-
+    
     # 如果使用deamon记录位移，请不要使用本函数，否则会造成数据缺失
     def getCnt(self):  # 整理本次到上次调用getCnt之间所有的数据
         cnt = self.port.inWaiting()
@@ -44,7 +62,7 @@ class Motor:
             if ch > 0:
                 chcnt[ch-1] += val
         return tuple(chcnt)
-
+    
     def startMoveDeamon(self, update = 0.1, hook = None):
         self.alive = True  # 关闭的时候需要设置这个
         self.okExit = threading.Event()
@@ -56,6 +74,7 @@ class Motor:
         self.thread_read.start()
 
     def closeMoveDeamon(self):
+        self.alive = False
         self.thread_read.join()
         self.thread_read = None
 
