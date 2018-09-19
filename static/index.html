@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="ch" style="height: 100%;">
+<head>
+    <meta charset="utf-8">
+    <!--meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"-->
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/dygraph.min.css">
+    <link rel="stylesheet" href="/static/css/bootstrap-switch.min.css">
+
+    <title>ArgosController</title>
+
+    <link rel="icon" href="/static/icon.png" type="image/x-icon">  <!-- 添加个图标装作很正式的样子~~~ -->
+    <link rel="shortcut icon" href="/static/icon.png" type="image/x-icon">
+
+    <style>
+        body {
+            background: url(/static/background.png)
+        }
+
+        .container {
+            margin-top: 20px;
+            width: inherit;
+            display: grid;
+            grid-template-columns: 60px auto 250px 250px;
+            grid-template-rows: 60px auto;
+            grid-column-gap: 10px;
+            grid-row-gap: 10px;
+            justify-items: stretch;
+            align-items: stretch;
+            grid-template-areas:
+                "icon header header header"
+                "basic main info control";
+        }
+
+        .icon {
+            grid-area: icon;
+            background-image: url("/static/icon.png");
+            background-size:cover;
+        }
+
+        .header {
+            grid-area: header;
+            align-self: center;
+            font-size: 300%;
+            font-weight: bolder;
+            color: antiquewhite;
+        }
+
+        .basic {
+            grid-area: basic;
+        }
+
+        .basic-button {
+            width: 100%;
+            height: 60px;
+            margin-bottom: 10px;
+        }
+
+        .card {
+            margin-bottom: 10px;
+        }
+
+        .card-body {
+            font-size: 80%;
+        }
+
+        .modified-warning {
+            color: firebrick;
+            font-size: 80%;
+            font-weight: bold;
+            display: none;
+        }
+
+    </style>
+
+</head>
+<body>
+    <div class="container">
+        <div class="icon"></div>
+        <div class="header">VLC Demo <font style="font-size: 50%;">reader version v0.1</font></div>
+        <div class="basic">
+            <button type="button" class="btn btn-success basic-button tooltips" id="Init" onclick="leftButtonClicked('Init');"
+                data-toggle="tooltip" data-placement="right" title="mode initialization, find Iris devices, etc. if failed, return to stop state.">Init</button>
+            <button type="button" class="btn btn-danger basic-button tooltips" id="Stop" disabled="disabled" onclick="leftButtonClicked('Stop');"
+                data-toggle="tooltip" data-placement="right" title="mode deinitialization. destroy Iris device handler safely">Stop</button>
+            <button type="button" class="btn btn-warning basic-button progress-bar-striped progress-bar-animated tooltips" style="height: 200px;" id="Sing" 
+                data-toggle="tooltip" data-placement="right" title="Not implemented"
+                onclick="leftButtonClicked('Sing');">Sing</button> <!-- get a single pic of now wave form, generally used in record mode -->
+            <button type="button" class="btn btn-danger basic-button tooltips" id="Hot" onclick="leftButtonClicked('Hot');"
+                data-toggle="tooltip" data-placement="right" title="hot reload 'mode' programs. this is really helpful when developing. just click 'stop' then 'hot' to reload all your programs in 'modes' folder">Hot</button> <!-- reload all modes function, best for developer -->
+            <button type="button" class="btn btn-light basic-button tooltips" id="Trig" onclick="leftButtonClicked('Trig');"
+                data-toggle="tooltip" data-placement="right" title="trigger an action in any mode. how this is performed is defined by each 'mode' program">Trig</button>
+            <button type="button" class="btn btn-dark basic-button tooltips" id="Reset" onclick="leftButtonClicked('Reset');"
+                data-toggle="tooltip" data-placement="right" title="reset the config, call only in stopped state">Reset</button>
+            <button type="button" class="btn btn-success basic-button tooltips" onclick="window.open('/save.json')"
+                data-toggle="tooltip" data-placement="right" title="save now configuration to a JSON file, for you convience. in chrome it will require you to press 'Ctrl+S' to save the json manully">Save</button>
+            <button type="button" class="btn btn-primary basic-button tooltips" onclick="$('#loadFileInput').click();"
+                data-toggle="tooltip" data-placement="right" title="load a configuration JSON file">Load</button>
+            <button type="button" class="btn btn-dark basic-button tooltips" onclick="leftButtonClicked('Data');"
+                data-toggle="tooltip" data-placement="right" title="see what files are in 'data' folder. the latest created one will be at the top, so don't worry if you have so many files here">Data</button>
+        </div>
+        <div style="grid-area: main;">
+            <div class="card">
+                <div class="card-header">
+                    <button class="btn btn-link" data-toggle="collapse" data-target="#AllInOneGraph" aria-expanded="true" 
+                        onclick="updateAllInOneGraph();">All-in-one Graph</button>
+                    <button class="btn btn-primary" onclick="window.open('/lastgraph.json')">see data in JSON</button>
+                    <button class="btn btn-warning" onclick="leftButtonClicked('Reload')">reload previous one</button>
+                </div>
+                <div id="AllInOneGraph" class="collapse show"><div class="card-body">
+                    <div style="height: 200px;" id="AllInOneGraph-0"></div>
+                </div></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><button class="btn btn-link" data-toggle="collapse" data-target="#ManualGraph" aria-expanded="true" onclick="updateManualGraph();">Manual Graph</button></div>
+                <div id="ManualGraph" class="collapse show"><div class="card-body">
+                    <div style="height: 200px;" id="ManualGraph-0"></div>
+                </div></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><button class="btn btn-link" data-toggle="collapse" data-target="#OriginGraph" aria-expanded="true" onclick="updateAllOriginGraph();">Original Graph</button></div>
+                <div id="OriginGraph" class="collapse show"><div class="card-body" id="OriginGraph-body">
+                    
+                </div></div>
+            </div>
+        </div>
+        <div style="grid-area: info;">
+            <div class="card">
+                <div class="card-header"><button class="btn btn-link" data-toggle="collapse" data-target="#SystemBasicInfo" aria-expanded="true">System Basic Information</button></div>
+                <div id="SystemBasicInfo" class="collapse show"><div class="card-body">
+                    <!-- 显示系统基本消息 -->
+                    Connected: <strong id="SystemBasicInfo-Connected" style="color: red;">False</strong><br/>
+                    System version: <strong id="SystemBasicInfo-SystemVersion">UNKNOWN</strong>
+                    Run status: <strong id="SystemBasicInfo-RunStatus">UNKNOWN</strong>
+                </div></div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <button class="btn btn-link" data-toggle="collapse" data-target="#SystemLogs" aria-expanded="true">System Log</button>
+                    <button class="btn btn-primary" onclick="$('#SystemLogs-body').children().remove();">clear</button>
+                </div>
+                <div id="SystemLogs" class="collapse show"><div class="card-body" id="SystemLogs-body" style="padding-bottom: 0px;">
+                    <!-- 显示log等弹出框 -->
+                </div></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><button class="btn btn-link" data-toggle="collapse" data-target="#SystemExtraInfos" aria-expanded="true">System Extra Information</button></div>
+                <div id="SystemExtraInfos" class="collapse show"><div class="card-body" id="SystemExtraInfos-body">
+                    <!-- 显示系统运行状态，比如温度等 -->
+                </div></div>
+            </div>
+        </div>
+        <div style="grid-area: control;">
+            <div class="card">
+                <div class="card-header"><button class="btn btn-link" data-toggle="collapse" data-target="#BasicSettings" aria-expanded="true">Basic Settings</button></div>
+                <div id="BasicSettings" class="collapse show"><div class="card-body">
+                    <!-- 设置使用的Iris模块编号等等 -->
+                    <strong style="color: red;">* must stop and reinitialize to set</strong><br/><br/>
+                    <font>Iris count:</font>
+                    <div class="input-group">
+                        <div class="input-group-prepend"><button type="button" class="btn btn-success" onclick="IrisCountChangeValue(-1);">-</button></div>
+                        <input type="text" class="form-control" placeholder="Iris count" id="BasicSettings-IrisCount" value="0"
+                            onKeyPress="if (event.keyCode == 13) event.srcElement.blur(); if ((event.keyCode<48 || event.keyCode>57)) event.returnValue=false;"
+                            onblur="generalValChanged('BasicSettings-IrisCount');" >
+                        <div class="input-group-append"><button type="button" class="btn btn-success" onclick="IrisCountChangeValue(1);">+</button></div>
+                    </div>
+                    <div class="modified-warning" id="m-BasicSettings-IrisCount">* argument modified but not sync yet.</div>
+                    <div style="margin-left: 80px; margin-right: -20px;">channel👇<font style="margin-left: 27px;">trigger👇</font></div>
+                    <div id="IrisDevicesBox"></div>
+                    <div style="margin-top: 10px;">
+                        <button class="btn btn-outline-primary dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="width: 100%;"
+                            id="BasicSettings-RunMode" value="choose a mode">choose a mode</button>
+                        <div class="dropdown-menu" id="BasicSettings-RunModeBox" style="min-width: 400px;">
+                            <a class="dropdown-item" href="#" modename="choose a mode"
+                                onclick="$('#BasicSettings-RunMode').html('choose a mode'); $('#BasicSettings-RunMode').val('choose a mode'); generalValChanged('BasicSettings-RunMode');">choose a mode</a>
+                        </div>
+                    </div>
+                    <div class="modified-warning" id="m-BasicSettings-RunMode">* argument modified but not sync yet.</div>
+                </div></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><button class="btn btn-link" data-toggle="collapse" data-target="#OtherSettings" aria-expanded="true">Other Settings</button></div>
+                <div id="OtherSettings" class="collapse show"><div class="card-body">
+                    <strong style="margin-right:10px;">QueryExtra</strong><input type="checkbox" id="OtherSettings-QueryExtra" checked>
+                    <div class="modified-warning" id="m-OtherSettings-QueryExtra">* argument modified but not sync yet.</div>
+                </div></div>
+            </div>
+            <button style="width: 100%; margin-bottom: 10px;" class="btn btn-danger" onclick="rejectAllModification();">reject all modification</button>
+            <button style="width: 100%; margin-bottom: 10px;" class="btn btn-success" onclick="syncSettingsToServer();">sync settings <strong>to</strong> server</button>
+            <div class="btn-group btn-group-toggle" data-toggle="buttons" style="width: 100%; margin-bottom: 10px;">
+                <label class="btn btn-secondary active" style="width: 50%;" onclick="changeSetMode('manual');">
+                    <input type="radio" name="options" autocomplete="off" checked> Manual set
+                </label>
+                <label class="btn btn-secondary" style="width: 50%;" onclick="changeSetMode('auto');">
+                    <input type="radio" name="options" autocomplete="off"> Auto set
+                </label>
+            </div>
+            <strong style="color: orchid; font-size: 15px;">* if auto, trigger once receive data</strong><br/>
+            <div class="btn-group btn-group-toggle" data-toggle="buttons" style="width: 100%; margin-bottom: 10px;">
+                <label class="btn btn-warning active" style="width: 50%;" onclick="changeTriggerMode(false);">
+                    <input type="radio" name="options" autocomplete="off" checked> One trigger
+                </label>
+                <label class="btn btn-warning" style="width: 50%;" onclick="changeTriggerMode(true);">
+                    <input type="radio" name="options" autocomplete="off"> Auto trigger
+                </label>
+            </div>
+            <div class="card">
+                <div class="card-header"><button class="btn btn-link" data-toggle="collapse" data-target="#GainSettings" aria-expanded="true">Gain Settings</button></div>
+                <div id="GainSettings" class="collapse show"><div class="card-body" id="GainSettingsBox" style="padding-bottom: 10px; padding-top: 10px;">
+                    <!-- 设置每一个Iris的Gain，各种Gain..... -->
+                </div></div>
+            </div>
+            <!--div class="card">
+                <div class="card-header"><button class="btn btn-link" data-toggle="collapse" data-target="#GainSettings" aria-expanded="true">Gain Settings</button></div>
+                <div id="GainSettings" class="collapse" aria-labelledby="headingOne" data-parent="#accordion"><div class="card-body">
+                    其他设置？还没想好，这里留一个模板吧
+                </div></div>
+            </div-->
+        </div>
+    </div>
+  
+    <!-- Modal -->
+    <div class="modal fade bd-example-modal-lg" id="ModalLong-Item" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ModalLong-Title">Modal title</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">File Name</th>
+                                <th scope="col">Size(B)</th>
+                                <th scope="col">Create Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ModalLong-Content">
+                            <tr>
+                                <th scope="row">1</th>
+                                <td>Filename here</td>
+                                <td>666666666</td>
+                                <td>2018-00-00 00:00:00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/jquery.min.js"></script>
+    <script src="/static/js/popper.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/jsrender.min.js"></script>
+    <script src="/static/js/socket.io.min.js"></script>
+    <script src="/static/js/jquery.nicescroll.min.js"></script>
+    <script src="/static/js/qunee-min.js"></script>
+    <script src="/static/js/jcanvas.min.js"></script>
+    <script src="/static/js/dygraph.min.js"></script>
+    <script src="/static/js/jquery.form.js"></script>
+    <script src="/static/js/bootstrap-switch.min.js"></script>
+
+    <script id='IrisSerialInput' type="text/html">
+        <div class="input-group" style="margin-bottom: 5px;" id="BasicSettings-IrisDevices-Box-{{:num}}">
+            <div class="input-group-prepend" style="margin-left: -15px;"><strong style="font-size: 170%">{{:num}}&nbsp;</strong></div>
+            <input type="text" class="form-control" placeholder="serial num" id="BasicSettings-IrisDevices-Serial-{{:num}}"
+                onKeyPress="if (event.keyCode == 13) event.srcElement.blur();" onblur="generalValChanged('BasicSettings-IrisDevices-{{:num}}');">
+            <div class="input-group-prepend">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+                    style="width: 40px;" id="BasicSettings-IrisDevices-Channel-{{:num}}">0</button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="#" onclick="$('#BasicSettings-IrisDevices-Channel-{{:num}}').html('0'); generalValChanged('BasicSettings-IrisDevices-{{:num}}');">0</a>
+                    <a class="dropdown-item" href="#" onclick="$('#BasicSettings-IrisDevices-Channel-{{:num}}').html('1'); generalValChanged('BasicSettings-IrisDevices-{{:num}}');">1</a>
+                    <a class="dropdown-item" href="#" onclick="$('#BasicSettings-IrisDevices-Channel-{{:num}}').html('2'); generalValChanged('BasicSettings-IrisDevices-{{:num}}');">0 and 1</a>
+                </div>
+            </div>
+            <div class="input-group-append">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+                    style="width: 47px;" id="BasicSettings-IrisDevices-Direction-{{:num}}"data>Rx</button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="#" onclick="$('#BasicSettings-IrisDevices-Direction-{{:num}}').html('Rx'); generalValChanged('BasicSettings-IrisDevices-{{:num}}');">Rx</a>
+                    <a class="dropdown-item" href="#" onclick="$('#BasicSettings-IrisDevices-Direction-{{:num}}').html('Tx'); generalValChanged('BasicSettings-IrisDevices-{{:num}}');">Tx</a>
+                </div>
+            </div>
+            <div class="input-group-append" style="width: 10px;">
+                <div class="input-group-text" style="width: 10px;">
+                    <input type="checkbox" id="BasicSettings-IrisDevices-Trigger-{{:num}}" style="margin-left: -5px;" onclick="generalValChanged('BasicSettings-IrisDevices-{{:num}}');">
+                </div>
+            </div>
+            <div class="modified-warning" id="m-BasicSettings-IrisDevices-{{:num}}">* argument modified but not sync yet.</div>
+        </div>
+    </script>
+
+    <script id='GraphShowTemplate' type="text/html">
+        <div id="OriginGraphDiv-{{:name}}">
+            <font>({{:name}}):</font>&nbsp;
+            <input type="checkbox" onclick="updateManualGraph();" id="OriginGraphCheckI-{{:name}}">I&nbsp;
+            <input type="checkbox" onclick="updateManualGraph();" id="OriginGraphCheckQ-{{:name}}">Q
+            <br/>
+            <div style="height: 150px;" id="OriginGraph-{{:name}}"></div>
+        </div>
+    </script>
+
+    <script id='SystemExtraInfosTemplate' type="text/html">
+        <div>
+            <strong>{{:serial}}:</strong>
+            <ul id="SystemExtraInfos-ULBOX-{{:serial}}">
+            </ul>
+        </div>
+    </script>
+
+    <script id='SystemExtraInfosElementTemplate' type="text/html">
+        <li keyName="{{:name}}">{{:name}}: <strong>UNKNOWN</strong></li>
+    </script>
+
+    <script id="DynamicAlertTemplate" type="text/html">
+        <div class="alert alert-{{:alertType}} alert-dismissible fade show" role="alert">
+            {{:msg}}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    </script>
+
+    <script id="RunModeElementTemplate" type="text/html">
+        <div modename="{{:name}}">
+            <a class="dropdown-item" href="#" onclick="$('#BasicSettings-RunMode').html('{{:name}}'); $('#BasicSettings-RunMode').val('{{:name}}'); generalValChanged('BasicSettings-RunMode');">{{:name}}</a>
+            <button class="btn btn-success basic-button" style="height: 25px; margin: 0 10px 0 10px; width: 100px; padding-top: 0;"
+                onclick="window.open('/static/docs/{{:name}}.html')">instruction</button>
+        </div>
+    </script>
+
+    <script id="GainSettingBlockTemplate" type="text/html">
+        <div id="GainSettings-{{:name}}">
+            <strong style="font-size: 150%">{{:name}}</strong>
+        </div>
+    </script>
+
+    <script id="GainSettingTemplate" type="text/html">
+        <div class="input-group input-group-sm" style="margin-bottom: 5px;">
+            <div class="input-group-prepend">
+                <span class="input-group-text" id="inputGroup-sizing-sm">{{:gainkey}}</span>
+            </div>
+            <!-- 允许输入特殊字符，因为可能需要设置precode这种复数？不管了，直接字符串发过去好了 -->
+            <input type="text" class="form-control" aria-label="Small" aria-describedby="inputGroup-sizing-sm" id="GainSettings-{{:name}}-{{:gainkey}}"
+                onKeyPress="if (event.keyCode == 13) event.srcElement.blur();"
+                onblur="generalValChanged('GainSettings-{{:name}}-{{:gainkey}}');">
+            <div class="modified-warning" id="m-GainSettings-{{:name}}-{{:gainkey}}">* argument modified but not sync yet.</div>
+        </div>
+    </script>
+
+    <script id="DataDirInfoTemplate" type="text/html">
+        <tr>
+            <th scope="row">{{:index}}</th>
+            <td>{{:filename}}</td>
+            <td>{{:size}}</td>
+            <td>{{:ctime}}</td>
+        </tr>
+    </script>
+
+
+    <script>
+        var nowSettings = {};  // 字典记录用户输出操作之前的值，如果用户没有改变输入则不触发发送
+        var settingKeys = ["BasicSettings-IrisCount"];
+        var settingMode = '';
+        var triggerMode = false;  // true means auto trig
+        var userModified = {};
+        function initNowValue() {
+            for (let key in settingKeys) {
+                nowSettings[settingKeys[key]] = $("#" + settingKeys[key]).val();  // 初始化这些值是为了防止出现太多红色警告，不代表服务器真的是这些参数
+            }
+            $('#OtherSettings-QueryExtra').bootstrapSwitch({
+                onText:"On",
+                offText:"Off",
+                onColor:"success",
+                offColor:"danger",
+                size:"small",
+                onSwitchChange:function(event,state){
+                    key = "OtherSettings-QueryExtra";
+                    val = (state ? "true" : "false");
+                    if (nowSettings[key] == val) {  // 用户虽然点击了input框，但与服务器端的值相同（或许没有改变输入框，又或许输入的刚好和服务器一样了）
+                        $("#m-" + key).hide();
+                        if (key in userModified) delete userModified[key];  // 从用户修改列表中删除
+                        return;
+                    }
+                    $("#m-" + key).show();  // 显示地告诉用户这个元素没有被同步
+                    userModified[key] = val;  // 更新表
+                    if (settingMode == 'auto') syncSettingsToServer();
+                }
+            });
+        }
+        $(initNowValue);  // 当文档准备好后init
+        function IrisCountChangeValue(val) {
+            let tar = parseInt(val) + parseInt($("#BasicSettings-IrisCount").val());
+            if (tar < 0) tar = 0;
+            $("#BasicSettings-IrisCount").val(tar);
+            generalValChanged("BasicSettings-IrisCount");
+        }
+        function updateIrisCount(val) {
+            let box = $("#IrisDevicesBox");
+            let nlen = box.children().length;
+            if (val > nlen) {  // 添加子元素
+                for (let i = nlen; i<val; ++i) {
+                    box.append($.templates("#IrisSerialInput").render({num: i}));
+                    let tarid = 'BasicSettings-IrisDevices-' + (i);
+                    if (tarid in nowSettings) setFullIrisDeviceString(tarid, nowSettings[tarid]); // 如果还没有跟服务器同步，则先减后加应该保留原来序列号
+                    // generalValChanged('BasicSettings-IrisDevices-' + (i+1));  // 不需要更新
+                }
+            } else if (val < nlen) {  // 删除子元素
+                for (let i = nlen-1; i>=val; --i) {
+                    $("#BasicSettings-IrisDevices-Box-" + i).remove();  // 删除父元素
+                }
+            }
+        }
+        function filter(key, val) {  // 为了防止有的值超出范围，这里做一个filter操作，修正用户输入
+            if (key == "BasicSettings-IrisCount") {
+                val = parseInt(val);
+                if (val < 0 || isNaN(val) || val > 200) {
+                    console.error('BasicSettings-IrisCount input error, set to 0');
+                    val = 0;
+                }
+                $("#" + key).val(val);
+                updateIrisCount(val);
+            }
+            return val;
+        }
+        function getFullIrisDeviceString(key) {
+            let prefix = "BasicSettings-IrisDevices-";
+            let num = key.slice(prefix.length);
+            let serial = $("#" + prefix + "Serial-" + num).val();
+            let channel = $("#" + prefix + "Channel-" + num).html();
+            let direction = $("#" + prefix + "Direction-" + num).html();
+            let trigger = document.getElementById(prefix + "Trigger-" + num).checked;  // if use as trigger source
+            return "" + serial + "-" + channel + "-" + direction + "-" + (trigger?1:0);
+        }
+        function setFullIrisDeviceString(key, val) {
+            let prefix = "BasicSettings-IrisDevices-";
+            let num = key.slice(prefix.length);
+            let serial=null, channel=null, direction=null, trigger=null;
+            let a = val.lastIndexOf('-'); if (a != -1) trigger = (val.slice(a+1) == "1");
+            let b = val.slice(0, a).lastIndexOf('-'); if (b != -1) direction = val.slice(b+1, a);
+            let c = val.slice(0, b).lastIndexOf('-'); if (c != -1) channel = val.slice(c+1, b);
+            serial = c == -1 ? "" : val.slice(0, c);
+            if (channel && direction && (trigger != null)) {
+                $("#" + prefix + "Serial-" + num).val(serial);
+                $("#" + prefix + "Channel-" + num).html(channel);
+                $("#" + prefix + "Direction-" + num).html(direction);
+                document.getElementById(prefix + "Trigger-" + num).checked = trigger;
+            } else console.error("Iris device string format error: " + val);
+
+        }
+        function generalValChanged(key) {
+            let val = $("#" + key).val();
+            if (key.startsWith("BasicSettings-IrisDevices-")) {  // special handle this
+                val = getFullIrisDeviceString(key);
+            } /*else if (key == "BasicSettings-RunMode") { // special handle this
+                val = $("#BasicSettings-RunMode option:selected").attr("modeName");
+            }*/
+            val = filter(key, val);  // 为了防止有的值超出范围，这里做一个filter操作，修正用户输入
+            if (key in nowSettings && nowSettings[key] == val) {  // 用户虽然点击了input框，但与服务器端的值相同（或许没有改变输入框，又或许输入的刚好和服务器一样了）
+                $("#m-" + key).hide();
+                if (key in userModified) delete userModified[key];  // 从用户修改列表中删除
+                return;
+            }
+            
+            // console.log("generalValChanged: \"" + key + "\"");
+            // console.log(val);
+            $("#m-" + key).show();  // 显示地告诉用户这个元素没有被同步
+            userModified[key] = val;  // 更新表
+            if (settingMode == 'auto') syncSettingsToServer();
+        }
+        function idInDOM(id) {
+            return ($("#" + id).length > 0)
+        }
+        function updateSettingsSubfunc(key, val) {
+            if (key.startsWith("BasicSettings-IrisDevices-")) setFullIrisDeviceString(key, val);  // special case: multiple html component for one value
+            else if (key == "BasicSettings-RunMode") { $('#' + key).html(nowSettings[key]); $('#' + key).attr('value', val); }
+            else if (key == "OtherSettings-QueryExtra") { $('#OtherSettings-QueryExtra').bootstrapSwitch('state', nowSettings[key]=='true' ? true : false); }
+            else $('#' + key).val(nowSettings[key]);
+        }
+        function updateSettingsNotSyncFlag(ignoreUserSet=false) {  // 对所有在nowSettings中的key做判断
+            for (let key in nowSettings) {
+                if (idInDOM(key) || (key.startsWith("BasicSettings-IrisDevices-") && idInDOM("m-" + key))) {  // 不存在的元素不管
+                    if ($('#m-' + key).is(':hidden')) {  // 只有hidden的，才是没有用户修改过的，系统才能够正常去修改他
+                        updateSettingsSubfunc(key, nowSettings[key]);
+                    } else {
+                        if (ignoreUserSet) {
+                            updateSettingsSubfunc(key, nowSettings[key]);
+                        }
+                        // 若系统和当前用户设置的一致了，取消用户定义
+                        if ((key.startsWith("BasicSettings-IrisDevices-") && getFullIrisDeviceString(key) == nowSettings[key]) 
+                            //|| (key.startsWith("BasicSettings-RunMode") && $("#BasicSettings-RunMode").html() == nowSettings[key])
+                            || $('#' + key).val() == nowSettings[key]
+                            || $('#OtherSettings-QueryExtra').bootstrapSwitch('state') == (nowSettings[key]=="true"?true:false)) $("#m-" + key).hide();
+                    }
+                }
+            }
+        }
+        function rejectAllModification() {  // 跟本地保存的nowSettings保持一致，忽略用户输入
+            updateIrisCount(parseInt(nowSettings['BasicSettings-IrisCount']));  // TODO: 修改其他结构
+            updateSettingsNotSyncFlag(ignoreUserSet=true);
+        }
+        function settingsUpdateFromServer(settings) {  // 服务器发过来当前的settings
+            console.log(settings)
+            $('#SystemBasicInfo-SystemVersion').html(settings.version);
+            $('#SystemBasicInfo-RunStatus').html(settings.state);
+            if ("availableModes" in settings) {
+                console.log(settings["availableModes"]);
+                let runmodebox = $("#BasicSettings-RunModeBox");
+                runmodebox.children("[modename!='choose a mode']").attr("toDelete", "yes");
+                for (let i=0; i < settings.availableModes.length; ++i) {
+                    let found = runmodebox.children("[modename='" + settings.availableModes[i] + "']");
+                    console.log(found);
+                    if (found.length == 0) {
+                        runmodebox.append($.templates('#RunModeElementTemplate').render({name: settings.availableModes[i]}));
+                    } else {
+                        found.removeAttr("toDelete")
+                    }
+                }
+                console.log(runmodebox.children("[toDelete='yes']"));
+                runmodebox.children("[toDelete='yes']").remove();
+            }
+            if ("gainStructure" in settings) {
+                let santarr = settings["gainStructure"];
+                let gainbox = $("#GainSettingsBox");
+                gainbox.children().attr("toDelete", "yes");
+                for (let i=0; i < santarr.length; ++i) {
+                    let name = santarr[i][0];
+                    let keys = santarr[i][1];
+                    if (!idInDOM("GainSettings-" + name)) {
+                        gainbox.append($.templates("#GainSettingBlockTemplate").render({name: name}));
+                        let ele = $("#GainSettings-" + name);
+                        for (let j=0; j < keys.length; ++j) {
+                            let key = keys[j];
+                            ele.append($.templates("#GainSettingTemplate").render({name: name, gainkey: key}));
+                        }
+                    } else {
+                        $("#GainSettings-" + name).removeAttr("toDelete");
+                    }
+                }
+                gainbox.children("[toDelete='yes']").remove();
+            }
+            if ("buttonStatus" in settings) {
+                let buttonStatus = settings.buttonStatus;
+                let classes = ['progress-bar-striped', 'progress-bar-animated']
+                if (buttonStatus["trig"]) {
+                    for (let i in classes) $('#Trig').addClass(classes[i]);
+                    $('#Trig').addClass('bg-info');
+                } else {
+                    for (let i in classes) $('#Trig').removeClass(classes[i]);
+                    $('#Trig').removeClass('bg-info');
+                }
+                if (buttonStatus["sing"]) {
+                    for (let i in classes) $('#Sing').addClass(classes[i]);
+                } else {
+                    for (let i in classes) $('#Sing').removeClass(classes[i]);
+                }
+            }
+            if (settings.state == "stopped") {  // stopped stop-pending
+                $('#Init').removeAttr("disabled");  $('#Stop').attr("disabled", "disabled"); $("#SystemBasicInfo-RunStatus").css('color', 'red');
+            } else if (settings.state == "running") {  // running run-pending
+                $('#Stop').removeAttr("disabled");  $('#Init').attr("disabled", "disabled"); $("#SystemBasicInfo-RunStatus").css('color', 'green');
+            } else {
+                $('#Init').attr("disabled", "disabled"); $('#Stop').attr("disabled", "disabled"); $("#SystemBasicInfo-RunStatus").css('color', 'magenta');
+            }
+            nowSettings = settings.userSettings;  // 保存在本地，并且更新以下数据结构
+            // 先修复各种数据结构，把该删除的元素删除，该增加的元素增加
+            if ($('#m-BasicSettings-IrisCount').is(':visible') && parseInt(nowSettings['BasicSettings-IrisCount']) != parseInt($('#BasicSettings-IrisCount').val())) {  // 用户修改数量了！
+                // do nothing 鬼知道用户在干什么，万一在改其他数据结构呢
+                console.warn('User is changing IrisCount, so system will not update structure of user settings.');
+            } else {
+                updateIrisCount(parseInt(nowSettings['BasicSettings-IrisCount']));  // TODO: 修改其他结构
+            }
+            updateSettingsNotSyncFlag();
+        }
+        function changeSetMode(mode) {
+            settingMode = mode;
+            if (mode == 'auto') {
+                syncSettingsToServer();
+            }
+        }
+        function changeTriggerMode(mode) {
+            triggerMode = mode;
+            if (triggerMode) {
+                leftButtonClicked("startAutoTrig");
+                leftButtonClicked('AutoTrig');
+            } else {
+                leftButtonClicked("endAutoTrig");
+            }
+        }
+        function extraInfosFromServer(extraInfos) {
+            $('#SystemExtraInfos-body').children().attr("toDelete", "yes");
+            if ('list' in extraInfos && 'data' in extraInfos) {
+                let lst = extraInfos['list'];
+                let dat = extraInfos['data'];
+                for (let i=0; i < lst.length; ++i) {
+                    let serial = lst[i];
+                    let localdata = dat[serial];
+                    if ($("#SystemExtraInfos-ULBOX-" + serial).length == 0) {
+                        $("#SystemExtraInfos-body").append($.templates("#SystemExtraInfosTemplate").render({serial: serial}));
+                    }
+                    let ulbox = $("#SystemExtraInfos-ULBOX-" + serial);
+                    ulbox.parent().removeAttr("toDelete");
+                    for (let j=0; j < localdata.length; ++j) {
+                        let key = localdata[j][0];
+                        let val = localdata[j][1];
+                        if (ulbox.children("[keyName='" + key + "']").length == 0) {
+                            ulbox.append($.templates("#SystemExtraInfosElementTemplate").render({name: key}))
+                        }
+                        ulbox.children("[keyName='" + key + "']").children("strong").html(val);
+                    }
+                }
+            } else {
+                console.error("extraInfos doesn't have list or data, do not kown how to display");
+                $('#SystemExtraInfos-body').children().remove();  // delete all its children
+            }
+            $('#SystemExtraInfos-body').children("[toDelete='yes']").remove();
+        }
+
+
+
+
+
+
+        // 绘图操作
+        var originData = {}; //{'I1': [1,2,2.5,2,1,0], 'Q1': [0,1,2,2.5,2,1]};
+        var originStruct = [];
+        var grefers = {};
+        var grefAll = null;
+        var grefManual = null;
+        function updateOrginGraph(name) {
+            let data = [];
+            if ('I-' + name in originData && 'Q-' + name in originData && originData['I-'+name].length == originData['Q-'+name].length) {
+                let glen = originData['I-'+name].length;
+                for (let j=0; j<glen; ++j) {
+                    data.push([j, originData['I-'+name][j], originData['Q-'+name][j]]);
+                }
+            }
+            grefers[name].updateOptions( { 'file': data } );
+        }
+        function updateMultipleGraph(graphref, checked) {
+            let minlen = -1;
+            for (let i=0; i<checked.length; ++i) {  // 跟最小的长度对齐
+                if (checked[i] in originData) {
+                    if (minlen == -1 || minlen > originData[checked[i]].length) minlen = originData[checked[i]].length;
+                } else {
+                    checked.splice(i, 1);
+                    console.error('cannot found ' + i + ' data, ignored');
+                    --i;
+                }
+            }
+            // if (minlen == -1) return;  // 允许绘制空图
+            let data = [];
+            for (let i=0; i<minlen; ++i) {
+                let subdat = [i];
+                for (let j=0; j<checked.length; ++j) {
+                    subdat.push(originData[checked[j]][i]);
+                }
+                data.push(subdat);
+            }
+            let labels = ['X'];
+            for (let j=0; j<checked.length; ++j) {
+                labels.push(checked[j])
+            }
+            graphref.updateOptions({
+                'labels': labels,
+                'file': data
+            })
+        }
+        function updateAllInOneGraph() {
+            let nowLen = $('#OriginGraph-body').children().length;
+            let checked = [];
+            for (let i in originStruct) {
+                let name = originStruct[i];
+                checked.push('I-' + name);
+                checked.push('Q-' + name);
+            }
+            if (checked.length == 0) return;
+            updateMultipleGraph(grefAll, checked);
+        }
+        function updateAllOriginGraph() {
+            for (let i=0; i < originStruct.length; ++i) {
+                updateOrginGraph(originStruct[i]);
+            }
+        }
+        function updateManualGraph() {
+            let nowLen = $('#OriginGraph-body').children().length;
+            let checked = [];
+            for (let i=0; i < originStruct.length; ++i) {
+                let name = originStruct[i];
+                if (document.getElementById('OriginGraphCheckI-' + name).checked) checked.push('I-' + name);
+                if (document.getElementById('OriginGraphCheckQ-' + name).checked) checked.push('Q-' + name);
+            }
+            // if (checked.length == 0) return;  // if 0, just print none of them
+            updateMultipleGraph(grefManual, checked);
+        }
+        function updateDrawWindows() {
+            settingstruct = originStruct;
+            let originbody = $('#OriginGraph-body');
+            originbody.children().attr("toDelete", "yes");
+            for (let i=0; i < settingstruct.length; ++i) {
+                let name = settingstruct[i];
+                let found = $("#OriginGraph-" + name);
+                if (found.length == 0) {
+                    originbody.append($.templates("#GraphShowTemplate").render({name: name}));
+                    let g = new Dygraph(  // 会导致一些内存浪费，不过这部分不怎么变动，也还好
+                        document.getElementById("OriginGraph-" + name),
+                        [],
+                        {
+                            labels: ['X', 'I', 'Q'],
+                            drawPoints: true,
+                            drawAxesAtZero: true,
+                            strokeWidth: 1
+                        }
+                    );
+                    grefers[name] = g;
+                } else found.parent().removeAttr("toDelete");
+            }
+            originbody.children("[toDelete='yes']").each(function() {
+                let id = $(this).attr("id");
+                let name = id.slice("OriginGraphDiv-".length);
+                grefers[name].destroy();
+                delete grefers[name];  // delete from map
+                // grefers.remove(name);  
+            })
+            originbody.children("[toDelete='yes']").remove();
+            updateAllOriginGraph();
+        }
+        $(function() {
+            grefAll = new Dygraph(
+                document.getElementById("AllInOneGraph-0"),
+                [],
+                {
+                    labels: ['X'],
+                    drawPoints: true,
+                    drawAxesAtZero: true,
+                    strokeWidth: 1,
+                    showRangeSelector: true
+                }
+            );
+            grefManual = new Dygraph(
+                document.getElementById("ManualGraph-0"),
+                [],
+                {
+                    labels: ['X'],
+                    drawPoints: true,
+                    drawAxesAtZero: true,
+                    strokeWidth: 1,
+                    showRangeSelector: true
+                }
+            )
+        });
+        function samplesFromServer(samples) {
+            console.log(samples);
+            originData = samples['data'];
+            originStruct = samples['struct'];
+            updateDrawWindows();
+            updateAllOriginGraph();
+            updateAllInOneGraph();
+            updateManualGraph();
+            if (triggerMode) {  // auto trig function
+                leftButtonClicked('AutoTrig');
+            }
+        }
+
+
+        // 上传文件
+        $(function() {
+            $('#loadFileInputForm').ajaxForm(function() {
+                console.log("file has been uploaded");
+                $('#loadFileInput').val('');
+            })
+        })
+
+        
+        // tooltips
+        $(function () {
+            $(".tooltips").tooltip({});
+        })
+
+
+        // 显示data文件夹内容
+        var nextShowDataDir = false;
+        function dataDirInfoFromServer(dataDirInfo) {
+            if (nextShowDataDir) {
+                console.log(dataDirInfo);
+                nextShowDataDir = false;
+                $('#ModalLong-Title').html("Data Directory Files: <font style='color: red;'>" + dataDirInfo.length + "</font> files");
+                $('#ModalLong-Content').children().remove();
+                for (let i=0; i<dataDirInfo.length; ++i) {
+                    let a = dataDirInfo[i];
+                    $('#ModalLong-Content').append($.templates('#DataDirInfoTemplate').render({index: i, filename: a[0], size: a[1], ctime: a[2]}));
+                }
+                $('#ModalLong-Item').modal("show");
+            }
+        }
+
+
+        // 通信部分，逻辑不在以下部分实现
+        var socketio = null;  // 全局变量，websocket client对象
+        var connectTimeout = null;  // 全局变量，当连续3个心跳包丢失时，系统显示“未连接”
+        $(function() {  // 初始化通信部分
+            socketio = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/');
+            console.log(socketio);
+            socketio.on('connect', function(socket) {
+                console.log('connected to server at ' + Date().toLocaleString());
+                $('#SystemBasicInfo-Connected').html('True');
+                $('#SystemBasicInfo-Connected').css('color', 'green');
+            });
+            socketio.on('disconnect', function(socket) {
+                console.log('disconnect from server at ' + Date().toLocaleString());
+                $('#SystemBasicInfo-Connected').html('False');
+                $('#SystemBasicInfo-Connected').css('color', 'red');
+            });
+            socketio.on('settings', function(settings) {
+                // console.log(settings);
+                settingsUpdateFromServer(settings);  // 交给逻辑层
+            });
+            socketio.on('samples', function(samples) {
+                samplesFromServer(samples);
+            });
+            socketio.on('extraInfos', function(extraInfos) {
+                extraInfosFromServer(extraInfos);
+            });
+            socketio.on('dataDirInfo', function(dataDirInfo) {
+                dataDirInfoFromServer(dataDirInfo)
+            });
+            socketio.on('log', function(msg) {
+                console.log(msg);
+                $("#SystemLogs-body").prepend($.templates("#DynamicAlertTemplate").render({alertType: "success", msg: msg}));
+            });
+            socketio.on('alert', function(msg) {
+                $("#SystemLogs-body").prepend($.templates("#DynamicAlertTemplate").render({alertType: "warning", msg: msg}));
+            });
+            socketio.on('error', function(msg) {
+                console.error(msg);
+                $("#SystemLogs-body").prepend($.templates("#DynamicAlertTemplate").render({alertType: "danger", msg: msg}));
+            });
+        });
+        function leftButtonClicked(id) {
+            if (id == 'Reset') socketio.emit('button', 'reset');
+            if (id == 'Init') socketio.emit('button', 'init');
+            if (id == 'Stop') socketio.emit('button', 'stop');
+            if (id == 'Sing') {
+                if ($("#Sing").hasClass('progress-bar-striped')) socketio.emit('button', 'cancel single');
+                else socketio.emit('button', 'single');
+            }
+            if (id == 'Trig') {
+                if ($("#Trig").hasClass('progress-bar-striped')) socketio.emit('button', 'cancel trigger');
+                else socketio.emit('button', 'trigger');
+            }
+            if (id == 'Hot') socketio.emit('button', 'hot');
+            if (id == 'startAutoTrig') socketio.emit('button', 'startAutoTrig');
+            if (id == 'endAutoTrig') socketio.emit('button', 'endAutoTrig');
+            if (id == 'AutoTrig') socketio.emit('button', 'AutoTrig');
+            if (id == 'Data') {
+                nextShowDataDir = true;
+                socketio.emit('button', 'data');
+            }
+            if (id == 'Reload') socketio.emit('button', 'reload');
+        }
+        function syncSettingsToServer() {
+            console.log(userModified);
+            socketio.emit('syncSettings', userModified);
+            userModified = {};
+        }
+    </script>
+
+</body>
+</html>
+

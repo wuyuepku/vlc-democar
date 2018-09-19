@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/jquery-ui.css">
+    <title>Remote Car</title>
+    <link rel="icon" href="/static/icon.png" type="image/x-icon">
+    <link rel="shortcut icon" href="/static/icon.png" type="image/x-icon">
+
+    <style>
+        html {
+            height: 100%;
+        }
+        body {
+            height: 100%;
+            max-width: 800px;
+            margin: 0 auto 0 auto;
+            padding: 20px;
+        }
+        #title img {
+            width: 80px;
+        }
+        #title h1 {
+            display: inline;
+        }
+        .container {
+            margin-top: 10px;
+            width: inherit;
+            display: grid;
+            grid-template-columns: 60px auto;
+            grid-template-rows: auto;
+            grid-column-gap: 10px;
+            grid-row-gap: 10px;
+            justify-items: stretch;
+            align-items: stretch;
+            grid-template-areas:
+                "left right";
+        }
+        #indicator strong {
+            font-size: 20px;
+            margin-right: 10px;
+            color: coral;
+        }
+        #indicator img {
+            width: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div id="title">
+        <img src="/static/icon.png"/>&nbsp;
+        <h1>Remote car controller<strong id="Connected" style="font-size:50%; margin-left: 10px;">disconnected</strong></h1>
+    </div>
+    <div class="container">
+        <div class="left">
+            <div id="slider-x" style="height:400px; margin-left: 10px;"></div>
+            <button type="button" class="btn btn-danger" onclick="setspeed({'vx': 0})" style="margin-top: 10px;">0</button>
+        </div>
+        <div class="right">
+            <div id="slider-y" style="display: inline-block; width: calc(100% - 40px);"></div>
+            <button type="button" class="btn btn-danger" onclick="setspeed({'vy': 0})">0</button>
+            <div id="indicator">
+                <img src="/static/svg/left.svg"/><strong>Vx</strong>
+                <img src="/static/svg/up.svg"/><strong>Vy</strong>
+                <img src="/static/svg/down.svg"/><strong>ω</strong>
+            </div>
+            <div id="slider-w" style="display: inline-block; width: calc(100% - 40px);"></div>
+            <button type="button" class="btn btn-danger" onclick="setspeed({'w': 0})">0</button>
+            <button type="button" class="btn btn-success" style="width: 90px; margin-top: 20px; height: 90px;" onclick="setmode('square')">square</button>
+            <button type="button" class="btn btn-primary" style="width: 90px; margin: 20px 0 0 10px; height: 90px;" onclick="setmode('circle')">circle</button>
+            <br/>
+            <button type="button" class="btn btn-warning" style="width: 200px; margin-top: 20px; height: 100px;"
+                onclick="setspeed({'vx': 0, 'vy': 0, 'w': 0}); setmode('');">stop</button>
+        </div>
+    </div>
+
+
+    <script src="/static/js/jquery.min.js"></script>
+    <script src="/static/js/popper.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/jsrender.min.js"></script>
+    <script src="/static/js/socket.io.min.js"></script>
+    <script src="/static/js/jquery.nicescroll.min.js"></script>
+    <script src="/static/js/qunee-min.js"></script>
+    <script src="/static/js/jcanvas.min.js"></script>
+    <script src="/static/js/dygraph.min.js"></script>
+    <script src="/static/js/jquery.form.js"></script>
+    <script src="/static/js/bootstrap-switch.min.js"></script>
+    <script src="/static/js/jquery-ui.js"></script>
+
+
+    <script>
+    $(function() {
+        $( "#slider-x" ).slider({
+            orientation: "vertical", range: "", min: -100, max: 100, value: 0,
+            slide: function( event, ui ) {
+                setspeed({'vx': ui.value});
+            }
+        });
+        $( "#slider-y" ).slider({
+            orientation: "horizontal", range: "", min: -100, max: 100, value: 0,
+            slide: function( event, ui ) {
+                setspeed({'vy': ui.value});
+            }
+        });
+        $( "#slider-w" ).slider({
+            orientation: "horizontal", range: "",  min: -100, max: 100, value: 0,
+            slide: function( event, ui ) {
+                setspeed({'w': ui.value});
+            }
+        });
+    });
+
+    function setspeed(speed) {  // send speed to server
+        socketio.emit('setspeed', speed);
+    }
+
+    function setmode(mode) {
+        socketio.emit('setmode', mode);
+    }
+
+    function updatespeed(speed) {  // update speed from server
+        console.log(speed);
+        if ('vx' in speed) $("#slider-x").slider("value", speed.vx);
+        if ('vy' in speed) $("#slider-y").slider("value", speed.vy);
+        if ('w' in speed) $("#slider-w").slider("value", speed.w);
+    }
+
+    var socketio = null;
+    $(function() {
+        socketio = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/');
+        console.log(socketio);
+        socketio.on('connect', function(socket) {
+            console.log('connected to server at ' + Date().toLocaleString());
+            $('#Connected').html('connected');
+            $('#Connected').css('color', 'green');
+        });
+        socketio.on('disconnect', function(socket) {
+            console.log('disconnect from server at ' + Date().toLocaleString());
+            $('#Connected').html('disconnected');
+            $('#Connected').css('color', 'red');
+        });
+        socketio.on('speed', function(speed) {
+            updatespeed(speed)
+        });
+    });
+
+    </script>
+</body>
